@@ -79,7 +79,7 @@ class PidController(Node):
 		# right turn scenario
 		if(right_diagonal_reading > 2.75):
 			# keep going straight until the car is in the turning
-			while(forward_reading <= 1.5):
+			while(forward_reading >= 1.5):
 				self.car_go()
 			# turn right until forward reading overshoots
 			while(forward_reading < 80 and left_diagonal_reading <= 2.8 and right_diagonal_reading <= 2.8):
