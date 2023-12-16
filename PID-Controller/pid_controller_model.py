@@ -5,7 +5,6 @@ from geometry_msgs.msg import Twist
 from deepracer_interfaces_pkg.msg import ServoCtrlMsg
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
-import matplotlib.pyplot as plt
 import numpy as np
 import keyboard
 import time
@@ -14,31 +13,29 @@ class PidController(Node):
 	
 	def __init__(self):
 		super().__init__('pid_controller')
-		# cmd_vel publisher
-		self.publisher_cmdvel = self.create_publisher(Twist, '/cmd_vel', 10)
-
-		# ServoCtrlMsg publisher
+		# publisher
+		print('Creating Pub')
 		self.publisher_servo = self.create_publisher(ServoCtrlMsg, '/cmdvel_to_servo_pkg/servo_msg', 10)
 
+		# subscriber
+		print('Creating Sub')
 		self.subscriber = self.create_subscription(LaserScan,'/scan', self.msg_callback,10)
 
-		# self.subscriber_odom = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-
-		self.ranges = 0.0
+		# defined variables
 		self.prev_error = 0.0
-		self.k_p = 1.25
+		self.k_p = 1.15 #1.15
 		self.k_i = 0.000
-		self.k_d = 0.0015
+		self.k_d = 0.67 #.78
 		self.dt = .01
 		self.integral = 0.0
 		self.angle = 0.0
-		self.iter = 0
-		self.steer_vals = []
-		self.time_vals = []
-		self.speed_mod = .65
+		self.speed_mod = .68
+		self.back_speed_mod = .70
+		self.angle_mod = -.35
+		self.right_reading_median = None
+		self.left_reading_median = None
+		self.forward_reading_median = None
 
-	# def odom_callback(self, msg):
-		# print("odom msg twist:", msg.twist)
 
 	def msg_callback(self, msg):        
 
@@ -50,68 +47,185 @@ class PidController(Node):
 			rclpy.shutdown()
 
 		# number of lidar readings in a given subscription
-		num_of_degrees = len(msg.ranges)
+		one_deg = len(msg.ranges)/360
 
-		# left and right readings
-		left_reading_old = msg.ranges[int(num_of_degrees / 4)]
-		right_reading_old = msg.ranges[int(num_of_degrees * 3/4)]
+		# forward reading median within a 16 degree cone
+		forward_readings = []
+		reading_range = np.array([352, 353, 354, 355, 356, 357, 358, 359, 0, 1, 2, 3, 4, 5, 6, 7, 8])
+		for i in reading_range:
+			idx = int(one_deg*i)
+			if msg.ranges[idx] < float('inf'):
+				forward_readings.append(msg.ranges[idx])
+				
+		self.forward_reading_median = np.median(forward_readings)
+		print('forward reading: %f' %self.forward_reading_median)
 
-		# getting left min
-		left_reading = float('inf')
-		for i in range(int(num_of_degrees / 2)):
-			if(msg.ranges[i] < left_reading):
-				left_reading = msg.ranges[i]
+		# front_right_readings = []
+		# for i in range(int(one_deg*320), int(one_deg*340)):
+		# 	if msg.ranges[i] < float('inf'):
+		# 		front_right_readings.append(msg.ranges[i])
+		# self.front_right_reading_median = np.median(front_right_readings)
+		# print('left reading: %f' %self.front_right_reading_median)
 
-		# getting right min
-		right_reading = float('inf')
-		for i in range(int(num_of_degrees / 2), num_of_degrees):
-			if(msg.ranges[i] < right_reading):
-				right_reading = msg.ranges[i]
+		# front_left_readings = []
+		# for i in range(int(one_deg*20), int(one_deg*40)):
+		# 	if msg.ranges[i] < float('inf'):
+		# 		front_left_readings.append(msg.ranges[i])
+		# self.front_left_reading_median = np.median(front_left_readings)
+		# print('left reading: %f' %self.front_left_reading_median)
 
-		# print("left_reading_old: ", left_reading_old, " left_reading: ", left_reading, " right_reading_old: ", right_reading_old, " right_reading: ", right_reading)
 
-		# adjusting angle based on pid (?)
-		error = right_reading - left_reading
-		print(error)
-		if(error > -80 and error < 80):
-			self.integral = self.integral + error # * self.dt
-			derivative = (error - self.prev_error) # / self.dt
-			self.angle = - (self.k_p * error + self.k_i * self.integral + self.k_d * derivative)
-			# print(error, self.angle)
+		# getting left median reading - 60 degrees to 30 degrees left of the 0th angle 
+		#print('Reading Left')
+		left_readings = []
+		for i in range(int(one_deg*20), int(one_deg*70)): #Prior Values: for i in range(int(one_deg*10), int(one_deg*70)):
+			if msg.ranges[i] < float('inf'):
+				left_readings.append(msg.ranges[i])
+		left_readings.sort()
+		for i in range(0,int(len(left_readings)/4)):
+			left_readings.pop()
+		self.left_reading_median = np.median(left_readings)
+		print('left reading: %f' %self.left_reading_median)
+		
+
+		# getting right median reading - 60 degrees to 30 degrees right of the 0th angle
+		#print('Reading Right')
+		right_readings = []
+		right_cull = []
+		for i in range(int(one_deg*290), int(one_deg*340)): #Prior Values: for i in range(int(one_deg*290), int(one_deg*350)):
+			right_cull.append(msg.ranges[i])
+			if msg.ranges[i] < float('inf'):
+				right_readings.append(msg.ranges[i])
+		right_readings.sort()
+		for i in range(0,int(len(right_readings)/4)):
+			right_readings.pop()
+		self.right_reading_median = np.median(right_readings)
+		print('right reading: %f' %self.right_reading_median)
+
+
+		# error calculation
+
+		error = self.right_reading_median - self.left_reading_median
+		
+		# car too close to the wall
+		if(self.forward_reading_median < 0.65):
+			print('U-Turn')
+			# make an u-turn by backing up a little and turning it
+			self.car_stop()
+
+			# reverse with slight steering to the left for 0.5 seconds
+			start_time = time.time()
+			while(time.time() - start_time < 1.0):
+				
+				# emergency stpping condition
+				if keyboard.is_pressed('t') and keyboard.is_pressed('x'):
+					print('oh no')
+					self.car_stop()
+					rclpy.shutdown()
+
+				self.car_turn_reverse_left()	
+
+			# turn right for 0.5 seconds OR until the forward reading overshoots (but I removed that part of the code)
+			start_time = time.time()
+			while(time.time() - start_time < 1.0):
+
+				# emergency stopping condition
+				if keyboard.is_pressed('t') and keyboard.is_pressed('x'):
+					print('oh no')
+					self.car_stop()
+					rclpy.shutdown()
+				
+				self.car_turn_right()
+		
+		#Right turn probably
+		elif  self.right_reading_median > 5 or self.right_reading_median > 5:
+			if keyboard.is_pressed('t') and keyboard.is_pressed('x'):
+				print('oh no')
+				self.car_stop()
+				rclpy.shutdown()
+			start_time = time.time()
+			while(time.time() - start_time < .5):
+				self.car_stop()
+			start_time = time.time()
+			while(time.time() - start_time < 2.25):
+				self.car_go()
+			start_time = time.time()
+			while(time.time() - start_time < 1.35):
+				self.car_turn_right()
+			print('right turn')
+
+		#t_intersection turn case
+		elif self.right_reading_median > 3.5 and self.left_reading_median > 3.5:
+			#start_time = time.time()
+			#while(time.time()-start_time < .5):
+			self.car_turn_right()
+
+		# straight hallway scenario
+		elif(error > -80 and error < 80):
+			# adjusting angle based on pid
+			print('Straight Hallway PID')
+			self.integral = self.integral + error
+			derivative = (error - self.prev_error)
+			self.angle = (-(self.k_p * error + self.k_i * self.integral + self.k_d * derivative)-self.angle_mod)#/11
 			self.prev_error = error
-			self.iter+=1
-			self.time_vals.append(time.time)
-			self.steer_vals.append(float(self.angle))
-			
+			print('Error: %f' %error)
+			print('Angle: %f' %self.angle)
 			# updating the angle in car_go command
 			self.car_go()
 
-		# if self.iter == 50:
-		#	self.car_stop()
-		# 	plt.title("Steering Angle") 
-		# 	plt.xlabel("time") 
-		# 	plt.ylabel("angle") 
-		# 	plt.plot(self.steer_vals) 
-		# 	plt.show()
 		
+	def car_turn_right(self):
+		# ServoCtrlMsg publish
+		print('right')
+		msg = ServoCtrlMsg()
+		msg.throttle = self.speed_mod	# lower speed when turning
+		msg.angle = -1.0
+		self.publisher_servo.publish(msg)
+
+
+	def car_turn_left(self):
+		# ServoCtrlMsg publish
+		print('left')
+		msg = ServoCtrlMsg()
+		msg.throttle = self.speed_mod # lower speed when turning
+		msg.angle = 1.0
+		self.publisher_servo.publish(msg)
+
+	
+	def car_turn_reverse_left(self):
+		print('revleft')
+		# ServoCtrlMsg publish
+		msg = ServoCtrlMsg()
+		msg.throttle = self.back_speed_mod # lower speed when turning
+		msg.angle = 1.0
+		self.publisher_servo.publish(msg)
+
+
+	def car_turn_reverse_right(self):
+		print('revright')
+		# ServoCtrlMsg publish
+		msg = ServoCtrlMsg()
+		msg.throttle = self.back_speed_mod # lower speed when turning
+		msg.angle = -1.0
+		self.publisher_servo.publish(msg)
+
 
 	def car_go(self):
 		# ServoCtrlMsg publish
+		print('Go')
 		msg = ServoCtrlMsg()
 		msg.angle = self.angle
 		msg.throttle = self.speed_mod
 		self.publisher_servo.publish(msg)
 
-		# self.get_logger().info('Publishing: "%s"' % msg)
 
 	def car_stop(self):
 		# ServoCtrlMsg publish
+		print('Stop')
 		msg = ServoCtrlMsg()
 		msg.angle = 0.0
 		msg.throttle = 0.0
 		self.publisher_servo.publish(msg)
-
-		# self.get_logger().info('Publishing: "%s"' % msg)
 
 
 def main(args=None):
@@ -129,3 +243,22 @@ def main(args=None):
 
 if __name__ == '__main__':
 	main()
+
+
+		# 	# after turning, make car's angle 0 again.
+		# 	self.car_go()
+
+		# # left turn scenario
+		# elif(left_diagonal_reading > 1.5):
+		# 	# keep going straight until the car is in the turning
+		# 	while(forward_reading <= 0.5):
+		# 		self.car_go()
+		# 	# turn right until forward reading overshoots
+		# 	while(forward_reading < 80 and left_diagonal_reading <= 1.5 and right_diagonal_reading <= 1.5):
+		# 		self.car_turn_left()
+		# 	# after turning, make car's angle 0 again.
+		# 	self.car_go()
+
+		# # left and right readings at 90 degrees
+		# left_reading = msg.ranges[int(num_of_degrees / 4)]
+		# right_reading = msg.ranges[int(num_of_degrees * 3/4)]
