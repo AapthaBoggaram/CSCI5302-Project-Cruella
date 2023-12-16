@@ -93,7 +93,6 @@ class PidController(Node):
 		right_readings = []
 		right_cull = []
 		for i in range(int(one_deg*290), int(one_deg*340)): #Prior Values: for i in range(int(one_deg*290), int(one_deg*350)):
-			right_cull.append(msg.ranges[i])
 			if msg.ranges[i] < float('inf'):
 				right_readings.append(msg.ranges[i])
 		right_readings.sort()
