@@ -25,12 +25,12 @@ class PidController(Node):
 		self.prev_error = 0.0
 		self.k_p = 1.15 #1.15
 		self.k_i = 0.000
-		self.k_d = 0.67 #.78
+		self.k_d = 0.70 #.78
 		self.dt = .01
 		self.integral = 0.0
 		self.angle = 0.0
-		self.speed_mod = .68
-		self.back_speed_mod = .70
+		self.speed_mod = .75
+		self.back_speed_mod = -.85
 		self.angle_mod = -.35
 		self.right_reading_median = None
 		self.left_reading_median = None
@@ -78,7 +78,7 @@ class PidController(Node):
 		# getting left median reading - 60 degrees to 30 degrees left of the 0th angle 
 		#print('Reading Left')
 		left_readings = []
-		for i in range(int(one_deg*20), int(one_deg*70)): #Prior Values: for i in range(int(one_deg*10), int(one_deg*70)):
+		for i in range(int(one_deg*15), int(one_deg*75)): #Prior Values: for i in range(int(one_deg*10), int(one_deg*70)):
 			if msg.ranges[i] < float('inf'):
 				left_readings.append(msg.ranges[i])
 		left_readings.sort()
@@ -91,7 +91,7 @@ class PidController(Node):
 		# getting right median reading - 60 degrees to 30 degrees right of the 0th angle
 		#print('Reading Right')
 		right_readings = []
-		for i in range(int(one_deg*290), int(one_deg*340)): #Prior Values: for i in range(int(one_deg*290), int(one_deg*350)):
+		for i in range(int(one_deg*285), int(one_deg*345)): #Prior Values: for i in range(int(one_deg*290), int(one_deg*350)):
 			if msg.ranges[i] < float('inf'):
 				right_readings.append(msg.ranges[i])
 		right_readings.sort()
@@ -106,14 +106,14 @@ class PidController(Node):
 		error = self.right_reading_median - self.left_reading_median
 		
 		# car too close to the wall
-		if(self.forward_reading_median < 0.65):
+		if(self.forward_reading_median < 1.0):
 			print('U-Turn')
 			# make an u-turn by backing up a little and turning it
 			self.car_stop()
 
 			# reverse with slight steering to the left for 0.5 seconds
 			start_time = time.time()
-			while(time.time() - start_time < 1.0):
+			while(time.time() - start_time < 2.25):
 				
 				# emergency stpping condition
 				if keyboard.is_pressed('t') and keyboard.is_pressed('x'):
@@ -125,7 +125,7 @@ class PidController(Node):
 
 			# turn right for 0.5 seconds OR until the forward reading overshoots (but I removed that part of the code)
 			start_time = time.time()
-			while(time.time() - start_time < 1.0):
+			while(time.time() - start_time < 1.25):
 
 				# emergency stopping condition
 				if keyboard.is_pressed('t') and keyboard.is_pressed('x'):
@@ -176,7 +176,7 @@ class PidController(Node):
 		# ServoCtrlMsg publish
 		print('right')
 		msg = ServoCtrlMsg()
-		msg.throttle = self.speed_mod	# lower speed when turning
+		msg.throttle = self.speed_mod*1.25	# lower speed when turning
 		msg.angle = -1.0
 		self.publisher_servo.publish(msg)
 
@@ -185,7 +185,7 @@ class PidController(Node):
 		# ServoCtrlMsg publish
 		print('left')
 		msg = ServoCtrlMsg()
-		msg.throttle = self.speed_mod # lower speed when turning
+		msg.throttle = self.speed_mod*1.25 # lower speed when turning
 		msg.angle = 1.0
 		self.publisher_servo.publish(msg)
 
