@@ -111,7 +111,7 @@ class PidController(Node):
         # 	print('right turn')
 
         # T intersection turn case
-        elif self.right_reading_median > 3.5 and self.left_reading_median > 3.5 and self.forward_reading_median > 3.5:
+        elif self.right_reading_median > 3.5 and self.left_reading_median > 3.5:
             self.car_turn_right()
 
         # straight hallway scenario
