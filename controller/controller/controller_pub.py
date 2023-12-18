@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
@@ -14,7 +15,7 @@ class ControllerNode(Node):
 		super().__init__('controller_node')
 		self.publisher_servo = self.create_publisher(ServoCtrlMsg, '/cmdvel_to_servo_pkg/servo_msg', 10)
 		self.i = 0
-		self.speed_mod = -.75
+		self.speed_mod = -.80
 		self.ang_mod = -1
 		self.timer = self.create_timer(0.1, self.publish_ctrl_msg)
 		pygame.init()
@@ -39,9 +40,40 @@ class ControllerNode(Node):
 		msg = ServoCtrlMsg()
 		print('Throttle: %f' %throttle)
 		print('Angle: %f' %angle)
-		#if np.abs(throttle) > 0.02:
+		print('Speed: %f' %self.speed_mod)
+		print('Steer: %f' %self.ang_mod)
+		events = pygame.event.get()
+		for event in events:
+			if event.type == pygame.JOYBUTTONDOWN:
+				print('button pressed')
+				if self.joystick1.get_button(0):
+					print('Decrease Speed..')
+					self.speed_mod = self.speed_mod + .02
+					print('Speed: %f' %self.speed_mod)
+				if self.joystick1.get_button(3):
+					print('Increase Speed..')
+					self.speed_mod = self.speed_mod - .02
+					print('Speed: %f' %self.speed_mod)
+				if self.joystick1.get_button(2):
+					print('oh no')
+					self.car_stop()
+					rclpy.shutdown()
+				if self.joystick1.get_button(4):
+					print('Decrease Steer..')
+					self.ang_mod = self.ang_mod + .10
+					print('Steer: %f' %self.ang_mod)
+				if self.joystick1.get_button(5):
+					print('Increase Steer')
+					self.ang_mod = self.ang_mod -.10
+					print('Steer: %f' %self.ang_mod)
+				if self.joystick1.get_button(1) or self.joystick1.get_button(6):
+					print('e-brake')
+					self.car_stop()
+
+		#if np.abs(throttle) > 1:
 		msg.throttle = self.speed_mod*throttle
 		msg.angle = self.ang_mod*angle
+		
 		#else:
 		#	msg.throttle = 0.0
 		#	msg.angle = -1.2*angle
@@ -55,8 +87,6 @@ class ControllerNode(Node):
 		msg.throttle = 0.0
 		self.publisher_servo.publish(msg)
 		self.get_logger().info('Publishing: "%s"' % msg)
-		self.i += 1
-		cont = input("Paused: Enter to continue...")
 
 		# self.get_logger().info('Publishing: "%s"' % msg)
 
