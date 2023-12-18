@@ -29,8 +29,8 @@ class PidController(Node):
 		self.dt = .01
 		self.integral = 0.0
 		self.angle = 0.0
-		self.speed_mod = .70 #.75
-		self.back_speed_mod = -.80
+		self.speed_mod = -.75 #.75
+		self.back_speed_mod = .70
 		self.angle_mod = -.35
 		self.previous_angle = 0.0
 		self.right_reading_median = None
@@ -97,7 +97,7 @@ class PidController(Node):
 			print('Straight Hallway PID')
 			self.integral = self.integral + error * self.dt
 			derivative = (error - self.prev_error) / self.dt
-			self.angle = (-(self.k_p * error + self.k_i * self.integral + self.k_d * derivative)-self.angle_mod)#/11
+			self.angle = ((self.k_p * error + self.k_i * self.integral + self.k_d * derivative)+self.angle_mod)#/11
 			self.prev_error = error
 			self.previous_angle = self.angle
 			print('Error: %f' %error)
