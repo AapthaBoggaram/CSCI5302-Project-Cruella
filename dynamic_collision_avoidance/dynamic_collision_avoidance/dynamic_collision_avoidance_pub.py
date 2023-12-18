@@ -14,12 +14,12 @@ class MinimalPublisher(Node):
 		super().__init__('minimal_publisher')
 		self.publisher_servo = self.create_publisher(ServoCtrlMsg, '/cmdvel_to_servo_pkg/servo_msg', 10)
 		self.i = 0
-		self.speed_mod = .65
+		self.speed_mod = .85
 	
 	def car_go(self):
 		# ServoCtrlMsg publish
 		msg = ServoCtrlMsg()
-		msg.angle = 0.0
+		msg.angle = 0.35
 		msg.throttle = self.speed_mod
 		self.publisher_servo.publish(msg)
 		self.get_logger().info('Publishing: "%s"' % msg)

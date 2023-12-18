@@ -1,0 +1,15 @@
+WebViz uses RosBridge for communication. 
+To launch rosbridge: roslaunch rosbridge_server rosbridge_websocket.launch
+Port can be defined using port paramater, i.e. 
+
+<launch>
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" > 
+     <arg name="port" value="8080"/>
+  </include>
+</launch>
+
+
+Alternately, running rosboard will allow you to visualize by running rosboard.launch and going to 
+http://your-robot-ip:8888/
+on any device (works on mobile!)
+
