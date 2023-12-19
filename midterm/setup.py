@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'reverse_pid_controller'
+package_name = 'midterm'
 
 setup(
     name=package_name,
@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'rpid = reverse_pid_controller.pid_controller_model:main'
+        	'sub = midterm.run_midterm_subscriber:main',
+        	'pub = midterm.run_midterm_publisher:main',
         ],
     },
 )

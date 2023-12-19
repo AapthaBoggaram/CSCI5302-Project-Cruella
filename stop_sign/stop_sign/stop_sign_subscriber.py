@@ -21,7 +21,7 @@ class StopSignSubscriber(Node):
 		print('Pub made')
 		self.i = 0
 		self.bridge = CvBridge()
-		self.speed_mod = .65
+		self.speed_mod = .70
 
 
 	def msg_callback(self, msg):

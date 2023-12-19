@@ -23,13 +23,13 @@ class PidController(Node):
 
 		# defined variables
 		self.prev_error = 0.0
-		self.k_p = .85 #1.15, 1.35
+		self.k_p = .80 #1.15, 1.35
 		self.k_i = 0.00
 		self.k_d = 0.0040 #.78
 		self.dt = .01
 		self.integral = 0.0
 		self.angle = 0.0
-		self.speed_mod = .70 #.75
+		self.speed_mod = .9 #.75
 		self.back_speed_mod = -.80
 		self.angle_mod = -.35
 		self.previous_angle = 0.0
@@ -217,3 +217,4 @@ def main(args=None):
 
 if __name__ == '__main__':
 	main()
+

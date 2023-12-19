@@ -1,3 +1,4 @@
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
@@ -23,14 +24,14 @@ class PidController(Node):
 
 		# defined variables
 		self.prev_error = 0.0
-		self.k_p = .5 #1.15, 1.35
+		self.k_p = .45 #1.15, 1.35
 		self.k_i = 0.00
-		self.k_d = 0.0040 #.78
+		self.k_d = 0.0035 #.78
 		self.dt = .01
 		self.integral = 0.0
 		self.angle = 0.0
-		self.speed_mod = -.75 #.75
-		self.back_speed_mod = .70
+		self.speed_mod = -.85 #.75
+		self.back_speed_mod = .75
 		self.angle_mod = -.35
 		self.previous_angle = 0.0
 		self.right_reading_median = None
@@ -64,7 +65,7 @@ class PidController(Node):
 		# getting left median reading - 60 degrees to 30 degrees left of the 0th angle 
 		#print('Reading Left')
 		left_readings = []
-		for i in range(int(one_deg*225), int(one_deg*260)): #Prior Values: for i in range(int(one_deg*10), int(one_deg*70)):
+		for i in range(int(one_deg*210), int(one_deg*260)): #Prior Values: for i in range(int(one_deg*10), int(one_deg*70)):
 			if msg.ranges[i] < float('inf') and not (np.isnan(msg.ranges[i])):
 				left_readings.append(msg.ranges[i])
 		left_readings.sort()
@@ -77,7 +78,7 @@ class PidController(Node):
 		# getting right median reading - 60 degrees to 30 degrees right of the 0th angle
 		#print('Reading Right')
 		right_readings = []
-		for i in range(int(one_deg*100), int(one_deg*135)): #Prior Values: for i in range(int(one_deg*290), int(one_deg*350)):
+		for i in range(int(one_deg*100), int(one_deg*150)): #Prior Values: for i in range(int(one_deg*290), int(one_deg*350)):
 			if (msg.ranges[i] < float('inf')) and not (np.isnan(msg.ranges[i])):
 				right_readings.append(msg.ranges[i])
 		right_readings.sort()
@@ -97,7 +98,7 @@ class PidController(Node):
 			print('Straight Hallway PID')
 			self.integral = self.integral + error * self.dt
 			derivative = (error - self.prev_error) / self.dt
-			self.angle = ((self.k_p * error + self.k_i * self.integral + self.k_d * derivative)+self.angle_mod)#/11
+			self.angle = (-(self.k_p * error + self.k_i * self.integral + self.k_d * derivative)+self.angle_mod)#/11
 			self.prev_error = error
 			self.previous_angle = self.angle
 			print('Error: %f' %error)
@@ -147,7 +148,7 @@ class PidController(Node):
 		print('right')
 		msg = ServoCtrlMsg()
 		msg.throttle = self.speed_mod	# lower speed when turning
-		msg.angle = -1.0
+		msg.angle = 1.0
 		self.publisher_servo.publish(msg)
 
 
@@ -156,7 +157,7 @@ class PidController(Node):
 		print('left')
 		msg = ServoCtrlMsg()
 		msg.throttle = self.speed_mod # lower speed when turning
-		msg.angle = 1.0
+		msg.angle = -1.0
 		self.publisher_servo.publish(msg)
 
 	
@@ -182,7 +183,7 @@ class PidController(Node):
 		# ServoCtrlMsg publish
 		print('Go')
 		msg = ServoCtrlMsg()
-		msg.angle = angle
+		msg.angle = -angle
 		msg.throttle = self.speed_mod
 		self.publisher_servo.publish(msg)
 
@@ -190,7 +191,7 @@ class PidController(Node):
 		print('go reverse')
 		msg = ServoCtrlMsg()
 		msg.throttle = self.back_speed_mod
-		msg.angle = -angle
+		msg.angle = angle
 		self.publisher_servo.publish(msg)
 
 	def car_stop(self):
@@ -206,11 +207,11 @@ def main(args=None):
 
 	rclpy.init(args=args) 
 
-	pid_controller = PidController()   
+	reverse_pid_controller = PidController()   
 	
 	rclpy.spin(reverse_pid_controller)
 
-	pid_controller.destroy_node()
+	reverse_pid_controller.destroy_node()
 
 	rclpy.shutdown()
 
